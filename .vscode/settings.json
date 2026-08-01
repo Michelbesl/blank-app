@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /workspaces/blank-app && python3 -m py_compile streamlit_app\\.py$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
