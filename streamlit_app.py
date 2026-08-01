@@ -35,6 +35,139 @@ st.markdown(
         border-color: #0056b3 !important;
         color: white !important;
     }
+    .sticky-summary {
+        position: sticky;
+        top: 0.1rem;
+    }
+    .summary-card {
+        border: 1px solid #d9e2ec;
+        border-radius: 0.75rem;
+        padding: 0.85rem 0.95rem;
+        background: #fbfdff;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+        margin-top: 0;
+    }
+    .sticky-summary div[data-testid="stVerticalBlockBorderWrapper"] {
+        border: 1px solid #d9e2ec;
+        border-radius: 0.75rem;
+        background: #fbfdff;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    }
+    .sticky-summary div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        padding: 0.75rem 0.85rem;
+    }
+    .summary-label {
+        font-size: 0.84rem;
+        color: #5f6b7a;
+        margin-bottom: 0.08rem;
+    }
+    .summary-value {
+        font-weight: 650;
+        line-height: 1.1;
+        margin-bottom: 0.56rem;
+        white-space: nowrap;
+    }
+    .summary-net {
+        color: #0d5bd7;
+        font-size: 1.5rem;
+    }
+    .summary-gross {
+        color: #334155;
+        font-size: 1.5rem;
+    }
+    .summary-discount {
+        font-size: 1.5rem;
+    }
+    .summary-discount-low {
+        color: #2e7d32;
+    }
+    .summary-discount-mid {
+        color: #ef6c00;
+    }
+    .summary-discount-high {
+        color: #c62828;
+    }
+    .summary-items {
+        color: #1f2d3d;
+        font-size: 1.9rem;
+    }
+    .line-item-header {
+        font-size: 0.9rem;
+        font-weight: 650;
+        margin-bottom: 0.18rem;
+        white-space: nowrap;
+    }
+    .line-item-row {
+        border-bottom: 1px solid #e8edf3;
+        padding: 0.12rem 0;
+        transition: background-color 120ms ease-in-out;
+    }
+    .line-item-row:hover {
+        background-color: #f6f9fc;
+    }
+    .line-item-name {
+        font-weight: 700;
+        font-size: 1.02rem;
+        line-height: 1.2;
+        margin-top: 0.08rem;
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: normal;
+    }
+    .line-total-cell {
+        font-weight: 700;
+        margin-top: 0;
+        min-height: 2.35rem;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        white-space: nowrap;
+        text-align: right;
+    }
+    .line-total-cell .label {
+        color: #5f6b7a;
+        font-size: 0.72rem;
+    }
+    .line-total-cell .value {
+        font-size: 1.16rem;
+        font-weight: 700;
+        color: #1f2d3d;
+    }
+    .line-item-row div[data-testid="stNumberInput"],
+    .line-item-row div[data-testid="stSelectbox"],
+    .line-item-row div[data-testid="stButton"] {
+        margin-bottom: 0;
+        margin-top: 0;
+    }
+    .line-item-row [data-testid="stNumberInput"] label,
+    .line-item-row [data-testid="stSelectbox"] label {
+        margin-bottom: 0;
+    }
+    div[data-testid="stNumberInput"] input {
+        text-align: right;
+        min-height: 2.35rem;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] {
+        min-height: 2.35rem;
+    }
+    .remove-col div[data-testid="stButton"] > button {
+        min-width: 2.05rem;
+        width: 2.05rem;
+        height: 2.35rem;
+        padding: 0;
+        font-size: 1rem;
+        line-height: 1.1;
+    }
+    .remove-col {
+        min-height: 2.35rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 0;
+    }
+    div[data-testid="stDivider"] {
+        margin: 0.85rem 0;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -44,6 +177,28 @@ st.markdown(
 def format_eur(amount: float) -> str:
     formatted = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return formatted
+
+
+def get_discount_color_class(total_discount_pct: float) -> str:
+    if total_discount_pct <= 30.0:
+        return "summary-discount-low"
+    if total_discount_pct <= 50.0:
+        return "summary-discount-mid"
+    return "summary-discount-high"
+
+
+def parse_decimal_input(raw_value: str, fallback: float, min_value: float = 0.0, max_value: float | None = None) -> float:
+    normalized = (raw_value or "").strip().replace(" ", "").replace(",", ".")
+    try:
+        parsed = float(normalized)
+    except ValueError:
+        parsed = fallback
+
+    if parsed < min_value:
+        parsed = min_value
+    if max_value is not None and parsed > max_value:
+        parsed = max_value
+    return parsed
 
 
 def truncate_text(text: str, max_chars: int) -> str:
@@ -266,20 +421,20 @@ if "line_items" not in st.session_state:
 elif "next_line_item_id" not in st.session_state:
     st.session_state.next_line_item_id = 1
 
-st.subheader("Add line item")
+st.subheader("Add Item")
 init_usage_state()
 
-item_type = st.selectbox("Item type", ["License", "Add-on"], index=0, key="item_type")
-primary_license = st.session_state.last_license_selected if item_type == "Add-on" else None
+with st.container(border=True):
+    item_type = st.selectbox("Item type", ["License", "Add-on"], index=0, key="item_type")
+    primary_license = st.session_state.last_license_selected if item_type == "Add-on" else None
 
-if item_type == "License":
-    item_catalog = products
-    item_names = sort_items(list(item_catalog.keys()), item_type, None)
-else:
-    item_catalog = addons
-    item_names = sort_items(list(item_catalog.keys()), item_type, primary_license)
+    if item_type == "License":
+        item_catalog = products
+        item_names = sort_items(list(item_catalog.keys()), item_type, None)
+    else:
+        item_catalog = addons
+        item_names = sort_items(list(item_catalog.keys()), item_type, primary_license)
 
-with st.form("add_line_item_form"):
     selected_item = st.selectbox(
         "Select item",
         ["Select item"] + item_names,
@@ -287,10 +442,10 @@ with st.form("add_line_item_form"):
         index=0,
     )
 
-    new_mode_symbol = st.selectbox("Pricing mode", ["%", "$"], key="new_mode")
+    new_mode_symbol = st.selectbox("Pricing mode", ["%", "€"], key="new_mode")
     new_mode = "Discount %" if new_mode_symbol == "%" else "Target amount"
     st.caption("Choose a license or add-on. Set discount % or target amount later in the line item row.")
-    add_clicked = st.form_submit_button("Add line item", type="primary", use_container_width=True)
+    add_clicked = st.button("Add line item", type="primary", use_container_width=True)
 
     if add_clicked:
         if selected_item != "Select item":
@@ -312,137 +467,191 @@ with st.form("add_line_item_form"):
             st.session_state.next_line_item_id += 1
 
 st.divider()
-if st.button("Clear all", type="secondary"):
-    st.session_state.line_items = []
-
-st.divider()
-st.subheader("Line items")
 
 line_total_net = 0.0
 vat_total = 0.0
+total_discount_pct = 0.0
 
 if st.session_state.line_items:
-    header_cols = st.columns([2.0, 1.0, 1.0, 1.0, 1.4, 1.2, 0.8])
-    with header_cols[0]:
-        st.markdown("**Item**")
-    with header_cols[1]:
-        st.markdown("**Price**")
-    with header_cols[2]:
-        st.markdown("**Qty**")
-    with header_cols[3]:
-        st.markdown("**%/$**")
-    with header_cols[4]:
-        st.markdown("**Discount / Target**")
-    with header_cols[5]:
-        st.markdown("**Line total**")
-    with header_cols[6]:
-        st.markdown("**Actions**")
+    heading_list_col, heading_summary_col = st.columns([3.85, 1.35], gap="small")
+    with heading_list_col:
+        st.subheader("Line Items")
+    with heading_summary_col:
+        st.subheader("Totals")
 
-    row_placeholders = []
-    for row in st.session_state.line_items:
-        cols = st.columns([2.0, 1.0, 1.0, 1.0, 1.4, 1.2, 0.8])
-        with cols[0]:
-            st.write(f"{row['name']} ({row['type']})")
-        with cols[1]:
-            row["price"] = st.number_input(
-                "Price €",
-                min_value=0.0,
-                value=row.get("price", 0.0),
-                step=1.0,
-                format="%.2f",
-                key=f"price_{row['id']}",
-            )
-        with cols[2]:
-            row["qty"] = st.number_input("Qty", min_value=0, step=1, value=row["qty"], key=f"qty_{row['id']}")
-        with cols[3]:
-            mode_options = ["%", "$"]
-            mode_display = "%" if row.get("mode", "Discount %") == "Discount %" else "$"
-            mode_index = mode_options.index(mode_display)
-            selected_mode_symbol = st.selectbox(
-                "Mode",
-                mode_options,
-                key=f"mode_{row['id']}",
-                index=mode_index,
-            )
-            row["mode"] = "Discount %" if selected_mode_symbol == "%" else "Target amount"
-        detail_placeholder = cols[4].empty()
-        if row["mode"] == "Discount %":
-            row["discount_pct"] = st.number_input(
-                "Discount %",
-                min_value=0.0,
-                max_value=100.0,
-                value=row.get("discount_pct", 0.0),
-                step=1.0,
-                key=f"pct_{row['id']}",
-            )
-            row["unit_net"] = row["price"] * (1 - row["discount_pct"] / 100)
-            detail_placeholder.write(f"{row['discount_pct']:.1f}% → €{row['unit_net']:,.2f}")
-        else:
-            row["target_net"] = st.number_input(
-                "Target amount €",
-                min_value=0.0,
-                value=row.get("target_net", row["price"]),
-                step=1.0,
-                format="%.2f",
-                key=f"target_{row['id']}",
-            )
-            if row["qty"] > 0:
-                row["unit_net"] = row["target_net"] / row["qty"]
-            else:
-                row["unit_net"] = 0.0
-            row["discount_pct"] = 0.0 if row["unit_net"] >= row["price"] else (1 - row["unit_net"] / row["price"]) * 100
-            detail_placeholder.write(f"€{row['target_net']:,.2f} → {row['discount_pct']:.1f}%")
-        line_total_placeholder = cols[5].empty()
-        line_total_placeholder.write(f"€{row['unit_net'] * row['qty']:,.2f}")
-        with cols[6]:
-            if st.button("×", key=f"remove_{row['id']}", help="Remove this line item"):
-                st.session_state.line_items = [item for item in st.session_state.line_items if item["id"] != row["id"]]
-                st.rerun()
-        row_placeholders.append((row, detail_placeholder, line_total_placeholder))
+    list_col, summary_col = st.columns([3.95, 1.35], gap="small")
 
-    line_total_net = sum(row["unit_net"] * row["qty"] for row in st.session_state.line_items)
-    original_total = sum(row["price"] * row["qty"] for row in st.session_state.line_items)
+    with list_col:
+        row_col_widths = [2.15, 1.7, 0.9, 1.45, 1.85, 1.6, 0.45]
+        header_cols = st.columns(row_col_widths, gap="small")
+        with header_cols[0]:
+            st.markdown('<div class="line-item-header">Item</div>', unsafe_allow_html=True)
+        with header_cols[1]:
+            st.markdown('<div class="line-item-header" style="text-align:right;">Price</div>', unsafe_allow_html=True)
+        with header_cols[2]:
+            st.markdown('<div class="line-item-header" style="text-align:right;">Qty</div>', unsafe_allow_html=True)
+        with header_cols[3]:
+            st.markdown('<div class="line-item-header">Discount Type</div>', unsafe_allow_html=True)
+        with header_cols[4]:
+            st.markdown('<div class="line-item-header" style="text-align:right;">Discount Value</div>', unsafe_allow_html=True)
+        with header_cols[5]:
+            st.markdown('<div class="line-item-header" style="text-align:right;">Line Total</div>', unsafe_allow_html=True)
+        with header_cols[6]:
+            st.markdown('<div class="line-item-header" style="text-align:center;">&nbsp;</div>', unsafe_allow_html=True)
 
-    # Optional overall target total: if set (>0), scale every line's current totals
-    target_total = st.number_input(
-        "Target total € (optional)",
+        line_total_placeholders = []
+        for row in st.session_state.line_items:
+            st.markdown('<div class="line-item-row">', unsafe_allow_html=True)
+            cols = st.columns(row_col_widths, gap="small")
+            with cols[0]:
+                st.markdown(f'<div class="line-item-name">{row["name"]}</div>', unsafe_allow_html=True)
+            with cols[1]:
+                st.markdown("<div style='height: 0.14rem;'></div>", unsafe_allow_html=True)
+                row["price"] = st.number_input(
+                    "Price €",
+                    min_value=0.0,
+                    value=row.get("price", 0.0),
+                    step=1.0,
+                    format="%.2f",
+                    key=f"price_{row['id']}",
+                    label_visibility="collapsed",
+                )
+            with cols[2]:
+                st.markdown("<div style='height: 0.14rem;'></div>", unsafe_allow_html=True)
+                row["qty"] = st.number_input(
+                    "Qty",
+                    min_value=0,
+                    step=1,
+                    value=row["qty"],
+                    key=f"qty_{row['id']}",
+                    label_visibility="collapsed",
+                )
+            with cols[3]:
+                st.markdown("<div style='height: 0.14rem;'></div>", unsafe_allow_html=True)
+                mode_options = ["%", "€"]
+                mode_display = "%" if row.get("mode", "Discount %") == "Discount %" else "€"
+                mode_index = mode_options.index(mode_display)
+                selected_mode_symbol = st.selectbox(
+                    "Discount Type",
+                    mode_options,
+                    key=f"mode_{row['id']}",
+                    index=mode_index,
+                    label_visibility="collapsed",
+                )
+                row["mode"] = "Discount %" if selected_mode_symbol == "%" else "Target amount"
+            with cols[4]:
+                st.markdown("<div style='height: 0.14rem;'></div>", unsafe_allow_html=True)
+                if row["mode"] == "Discount %":
+                    discount_value_text = st.text_input(
+                        "Discount Value",
+                        value=f"{row.get('discount_pct', 0.0):.1f}",
+                        key=f"discount_value_pct_{row['id']}",
+                        label_visibility="collapsed",
+                    )
+                    row["discount_pct"] = parse_decimal_input(
+                        discount_value_text,
+                        fallback=row.get("discount_pct", 0.0),
+                        min_value=0.0,
+                        max_value=100.0,
+                    )
+                    row["unit_net"] = row["price"] * (1 - row["discount_pct"] / 100)
+                else:
+                    discount_value_text = st.text_input(
+                        "Discount Value",
+                        value=f"{row.get('target_net', row['price']):.2f}",
+                        key=f"discount_value_target_{row['id']}",
+                        label_visibility="collapsed",
+                    )
+                    row["target_net"] = parse_decimal_input(
+                        discount_value_text,
+                        fallback=row.get("target_net", row["price"]),
+                        min_value=0.0,
+                    )
+                    if row["qty"] > 0:
+                        row["unit_net"] = row["target_net"] / row["qty"]
+                    else:
+                        row["unit_net"] = 0.0
+                    row["discount_pct"] = 0.0 if row["unit_net"] >= row["price"] else (1 - row["unit_net"] / row["price"]) * 100
+            with cols[5]:
+                st.markdown("<div style='height: 0.14rem;'></div>", unsafe_allow_html=True)
+                line_total_placeholder = st.empty()
+                line_total_placeholder.markdown(
+                    f'<div class="line-total-cell"><div class="value">€{row["unit_net"] * row["qty"]:,.2f}</div></div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[6]:
+                st.markdown("<div style='height: 0rem;'></div>", unsafe_allow_html=True)
+                st.markdown('<div class="remove-col">', unsafe_allow_html=True)
+                if st.button("×", key=f"remove_{row['id']}", help="Remove this line item"):
+                    st.session_state.line_items = [item for item in st.session_state.line_items if item["id"] != row["id"]]
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+            line_total_placeholders.append((row, line_total_placeholder))
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        line_total_net = sum(row["unit_net"] * row["qty"] for row in st.session_state.line_items)
+        original_total = sum(row["price"] * row["qty"] for row in st.session_state.line_items)
+
+    target_total = parse_decimal_input(
+        st.session_state.get("target_total_text", f"{st.session_state.get('target_total', 0.0):.2f}"),
+        fallback=float(st.session_state.get("target_total", 0.0)),
         min_value=0.0,
-        value=0.0,
-        step=1.0,
-        format="%.2f",
-        key="target_total",
     )
+    st.session_state.target_total = target_total
+
+    footer_left, footer_right = st.columns([3.85, 1.35], gap="small")
+    with footer_left:
+        st.markdown("&nbsp;", unsafe_allow_html=True)
+    with footer_right:
+        st.markdown("<div style='height: 1.45rem;'></div>", unsafe_allow_html=True)
+        if st.button("Clear all", type="secondary", key="clear_all_bottom"):
+            st.session_state.line_items = []
+            st.rerun()
 
     if target_total > 0 and line_total_net > 0:
         scale = float(target_total) / float(line_total_net)
         for row in st.session_state.line_items:
             base_price = row["price"]
-            # Scale the unit net amount, keeping the mode unchanged
             row["unit_net"] = round(row["unit_net"] * scale, 2)
-            
-            # Recalculate discount % based on new unit_net and current price
             row["discount_pct"] = 0.0 if row["unit_net"] >= base_price else (1 - row["unit_net"] / base_price) * 100
-            
-            # If in target amount mode, also update target_net to match
             if row.get("mode") == "Target amount" and row["qty"] > 0:
                 row["target_net"] = round(row["unit_net"] * row["qty"], 2)
-        
+
         line_total_net = sum(row["unit_net"] * row["qty"] for row in st.session_state.line_items)
-        for row, detail_placeholder, line_total_placeholder in row_placeholders:
-            if row["mode"] == "Discount %":
-                detail_placeholder.write(f"{row['discount_pct']:.1f}% → €{row['unit_net']:,.2f}")
-            else:
-                detail_placeholder.write(f"€{row['target_net']:,.2f} → {row['discount_pct']:.1f}%")
-            line_total_placeholder.write(f"€{row['unit_net'] * row['qty']:,.2f}")
+        for row, line_total_placeholder in line_total_placeholders:
+            line_total_placeholder.markdown(
+                f'<div class="line-total-cell"><div class="value">€{row["unit_net"] * row["qty"]:,.2f}</div></div>',
+                unsafe_allow_html=True,
+            )
 
     vat_total = line_total_net * 1.19
     total_discount_pct = 0.0 if original_total == 0 else (1 - line_total_net / original_total) * 100
+    discount_color_class = get_discount_color_class(total_discount_pct)
 
-    st.divider()
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Net total", f"€{line_total_net:,.2f}")
-    col2.metric("Gross incl. 19% VAT", f"€{vat_total:,.2f}")
-    col3.metric("Total decrease", f"{total_discount_pct:,.1f}%")
+    with summary_col:
+        st.markdown('<div class="sticky-summary">', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown('<div class="summary-label">Net total</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="summary-value summary-net" style="text-align:right;">€{line_total_net:,.2f}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="summary-label">Gross incl. 19% VAT</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="summary-value summary-gross" style="text-align:right;">€{vat_total:,.2f}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="summary-label">Total decrease</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="summary-value summary-discount {discount_color_class}" style="text-align:right;">{total_discount_pct:,.1f}%</div>',
+                unsafe_allow_html=True,
+            )
+            target_total_text = st.text_input(
+                "Target total € (optional)",
+                value=f"{target_total:.2f}",
+                key="target_total_text",
+            )
+            target_total = parse_decimal_input(
+                target_total_text,
+                fallback=target_total,
+                min_value=0.0,
+            )
+            st.session_state.target_total = target_total
+        st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.info("Add a license or add-on line item with discount to start building the quote.")
 

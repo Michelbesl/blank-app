@@ -3,6 +3,8 @@
         "/^cd /workspaces/blank-app && python3 -m py_compile streamlit_app\\.py$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "uv": true,
+        "/workspaces/blank-app/.venv-1/bin/python": true
     }
 }
